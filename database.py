@@ -114,16 +114,29 @@ class Database :
         except Exception as e :
             print(f"Виникла помилка: {e}")
 
+    def add_service(self) :
+        while True :
+            s_title = input("Введіть назву процедури (для завершення введіть стоп): ")
+            if s_title.lower() == 'стоп' :
+                break
+            try :
+                s_price = int(input("Введіть ціну: ").strip())
+            except ValueError :
+                print("Помилка! Ціна має бути числом. Спробуйте ще раз.")
+                continue
+            new_s_id = self.execute_query("INSERT INTO Services (title, price) VALUES (%s, %s) RETURNING id", (s_title, s_price))
+            print(f"Процедура {s_title}, ціна {s_price} збережено!")
 
-db = Database()
+            self.show_all_masters()
+            m_ids_input = input("Введіть ID майстрів через пробіл: ").strip().split()
+            for m_id in m_ids_input :
+                if m_id.isdigit() :
+                    self.execute_query("INSERT INTO MasterServices (master_id, services_id) VALUES (%s, %s) RETURNING id", (m_id, new_s_id))
 
-admin = db.add_user('admin_login', 'admin_pass12345', 'admin')
-users = db.fetch_all("SELECT id, login, role FROM Users")
-print("Список користувачів у базі:")
-for user in users :
-    print(user)
-
-db.add_master()
-all_master = db.fetch_all("SELECT * FROM Masters")
-for master in all_master :
-    print(master)
+    def show_all_masters(self) :
+        rows = self.fetch_all("SELECT id, name, specialization FROM Masters")
+        if not rows :
+            print("Майстра не існує!")
+        else :
+            for row in rows :
+                print(f"ID: {row[0]:<3} | Майстер: {row[1]:<30} | Спеціальність: {row[2]:<30}")
