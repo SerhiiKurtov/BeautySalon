@@ -1,19 +1,40 @@
+import getpass
+
 from database import Database
+from admin import AdminManager
+from client import ClientManager
 
 db = Database()
+db.init_admin()
+admin_manager = AdminManager(db)
 
-admin = db.add_user('admin_login', 'admin_pass12345', 'admin')
-users = db.fetch_all("SELECT id, login, role FROM Users")
-print("Список користувачів у базі:")
-for user in users :
-    print(user)
+client_manager = ClientManager(db)
 
-db.add_master()
-all_master = db.fetch_all("SELECT * FROM Masters")
-for master in all_master :
-    print(master)
-
-db.add_service()
-all_services = db.fetch_all("SELECT * FROM Services")
-for service in all_services:
-    print(service)
+while True :
+    main_menu = (f"Головне меню\n"
+                 f"Введіть 1 - Меню клієнта\n"
+                 f"Введіть 2 - Вхід для персоналу\n"
+                 f"Введіть 0 - Вихід")
+    print(main_menu)
+    try :
+        action = int(input("Оберіть дію: ").strip())
+    except Exception as e :
+        print(f"Виникла помилка: {e}, введіть данні цифрами!")
+        continue
+    if action == 0 :
+        break
+    elif action == 1 :
+        client_manager.client_menu()
+    elif action == 2 :
+        login = input("Ввeдіть логін адміністратора або майстра: ")
+        password = getpass.getpass("Введіть пароль: ")
+        user = db.authenticate(login, password)
+        if user and user['role'] == 'admin' :
+            admin_manager.admin_menu(user['id'])
+        elif user and user['role'] == 'master' :
+            print("Меню майстра в розробці...")
+        else :
+            print("Невірний логін або пароль!")
+    else :
+        print("Такого пункту не існує!")
+        continue
