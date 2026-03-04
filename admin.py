@@ -15,6 +15,7 @@ class AdminManager :
                         f"Введіть 1 - додати майстра\n"
                         f"Введіть 2 - для запису на процедуру\n"
                         f"Введіть 3 - переглянути персонал\n"
+                        f"Введіть 4 - налаштувати графік\n"
                         f"Введіть 0 - вихід\n")
             print(main_menu)
             try :
@@ -24,18 +25,24 @@ class AdminManager :
                 continue
             if action == 0 :
                 break
+
             elif action == 1 :
                 self.db.add_master()
                 all_master = self.db.fetch_all("SELECT * FROM Masters")
                 for master in all_master :
                     print(master)
+
             elif action == 2 :
                 self.db.add_service()
                 all_services = self.db.fetch_all("SELECT * FROM Services")
                 for service in all_services:
                     print(service)
+
             elif action == 3 :
                 users = self.db.fetch_all("SELECT id, login, role FROM Users")
                 print("Список користувачів у базі:")
                 for user in users :
                     print(user)
+
+            elif action == 4 :
+                self.db.add_schedule()

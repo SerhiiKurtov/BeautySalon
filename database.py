@@ -9,6 +9,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import getpass
 
+import calendar
+
 class Database :
     def __init__(self) :
         try :
@@ -197,6 +199,45 @@ class Database :
         user_data = self.cur.fetchone()
         if user_data:
             user_id, hashed_password, role = user_data
-            if check_password_hash(hashed_password, password):
+            if check_password_hash(hashed_password, password) :
                 return {'id': user_id, 'role': role}
         return None
+    
+    def add_schedule(self) :
+        self.show_all_masters()
+        try :
+            m_id = int(input("Оберіть id майстра: ").strip())
+            year = int(input("Oберіть рік (наприклад 2026): ").strip())
+            month = int(input("Oберіть місяць від 1 до 12: ").strip())
+        except Exception as e :
+            print(f"Виникла помилка: {e}, введіть данні цифрами!")
+            return
+        
+        num_day = calendar.monthrange(year, month)[1]
+
+        time_day = []
+        while True :
+            hour = input("Введіть час прийому (у форматі HH:MM), для завершення введіть стоп: ").strip()
+            if hour.lower() == 'стоп' :
+                print("Робоці години визначені!")
+                break
+            time_day.append(hour)
+        
+        for day in range(1, num_day + 1) :
+            current_data = f"{year}-{month:02}-{day:02}"
+            for hour in time_day :
+                try :
+                    self.execute_query("INSERT INTO Schedule (work_date, work_time, master_id) VALUES (%s, %s, %s)", (current_data, hour, m_id))
+                except psycopg2.IntegrityError :
+                    print(f"Помилка: Час {hour} на цю дату вже існує!")
+                except Exception as e :
+                    print(f"Виникла помилка: {e}")
+
+        weekend_input = input("Введіть числа місяця, які будуть вихідними (через пробіл): ").strip().split()
+        for day_off in weekend_input :
+            if day_off.isdigit() and int(day_off) <= num_day and int(day_off) > 0 :
+                weekends = f"{year}-{month:02}-{int(day_off):02}"
+                self.execute_query("UPDATE Schedule SET is_available = 2 WHERE work_date = %s AND master_id = %s", (weekends, m_id))
+                print(f"Вихідні: {weekends} майстра {m_id}")
+            else :
+                print("Помилка: введіть коректне значення!")        
