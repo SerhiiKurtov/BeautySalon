@@ -92,10 +92,10 @@ class Database :
             CREATE TABLE IF NOT EXISTS Bookings (
                 id SERIAL PRIMARY KEY,
                 status VARCHAR(20) DEFAULT 'pending',
-                full_time VARCHAR(30) NOT NULL,
                 master_id INTEGER REFERENCES Masters (id),
                 client_id INTEGER REFERENCES Client (id),
-                services_id INTEGER REFERENCES Services (id)
+                services_id INTEGER REFERENCES Services (id),
+                schedule_id INTEGER REFERENCES Schedule (id)
         );
         '''
 
@@ -240,4 +240,94 @@ class Database :
                 self.execute_query("UPDATE Schedule SET is_available = 2 WHERE work_date = %s AND master_id = %s", (weekends, m_id))
                 print(f"Вихідні: {weekends} майстра {m_id}")
             else :
-                print("Помилка: введіть коректне значення!")        
+                print("Помилка: введіть коректне значення!")
+
+    def client_booking(self) :
+        full_spec = self.fetch_all("SELECT DISTINCT specialization FROM Masters")
+        if not full_spec :
+            print("Спеціаліста не існує")
+        else :
+            for num, spec in enumerate(full_spec, start=1) :
+                print(f"ID: {num} - {spec[0]}")
+            try :
+                spec_index = int(input("Оберіть ID бажаної спеціальності: ").strip())
+            except Exception as e :
+                print(f"Виникла помилка {e}, введіть ID цифрою!")
+                return
+            
+            if 1 <= spec_index <= len(full_spec) :
+                select_spec = full_spec[spec_index - 1][0]
+                services = self.fetch_all('''SELECT DISTINCT s.id, s.title, s.price
+                                          FROM Services s
+                                          JOIN MasterServices ms ON s.id = ms.service_id
+                                          JOIN Masters m ON ms.master_id = m.id
+                                          WHERE m.specialization = %s
+                                          ''', (select_spec,))
+                if not services :
+                    print("Послуги не існує!")
+                else :
+                    for row in services :
+                        print(f"ID: {row[0]:<3} | Процедура: {row[1]:<30} | Ціна: {row[2]}")
+                    try :
+                        s_id = int(input("Оберіть ID бажаної процедури: ").strip())
+                    except :
+                        print("Введіть значення цифрою")
+                        return
+                    
+                    master_id = self.fetch_all('''SELECT m.id, m.name
+                                               FROM Masters m
+                                               JOIN MasterServices ms ON m.id = ms.master_id
+                                               WHERE services_id = %s
+                                               ''', (s_id,))
+                    if not master_id :
+                        print("Спеціаліста не існує!")
+                    else :
+                        for master in master_id :
+                            print(f"ID: {master[0]:<3} | Спеціаліст: {master[1]:<30} |")
+                        try :
+                            final_master_id = int(input("Оберіть ID бажаного спеціаліста: ").strip())
+                        except :
+                            print("Введіть значення цифрою")
+                            return
+                        
+                    date_id = self.fetch_all('''SELECT id, work_date, work_time
+                                 FROM Schedule
+                                 WHERE master_id = %s AND is_available = TRUE
+                                 ''', (final_master_id,))
+                    for row in date_id :
+                        print(f"{row[0]:<4} | {row[1]:<6} - {row[2]:<15}")
+                    try :
+                        d_id = int(input("Оберіть ID бажаного часу: ").strip())
+                    except :
+                        print("Введіть значення цифрою")
+                        return
+                    
+                    while True :
+                        name = input("Введіть ваше ім'я та прізвище: ").strip()
+                        if " " in name and len(name) >= 5 :
+                            break
+                        else :
+                            print("Помилка: введіть, будь ласка, і ім'я, і прізвище!")
+                            continue
+                    
+                    while True :
+                        phone = input("Введіть номер телефону: ").strip()
+                        if phone.isdigit() and len(phone) == 10 :
+                            print("Дякуємо! Номер прийнято.")
+                            break
+                        else :
+                            print("Введіть коретний номер телефону!")
+                            continue
+                    
+                    try :
+                        new_client_id = self.execute_query("INSERT INTO Client (name, phone) VALUES (%s, %s) RETURNING id", (name, phone))
+                        self.execute_query("INSERT INTO Bookings (master_id, services_id, schedule_id, client_id) VALUES (%s, %s, %s, %s)", (final_master_id, s_id, d_id, new_client_id))
+                        self.execute_query("UPDATE Schedule SET is_available = 0 WHERE id = %s", (d_id,))
+                    except psycopg2.IntegrityError :
+                        print(f"Помилка: цей час уже заброньовано!")
+                    except Exception as e :
+                        print(f"Виникла помилка: {e}")
+                    print(f"Вітаємо, {name}! Ви успішно записані. Чекаємо на вас!")
+            else :
+                print(f"Спеціаліста з ID {spec_index} не існує")
+                return
