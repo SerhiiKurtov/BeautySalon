@@ -25,7 +25,9 @@ class Database :
             result = None
             self.cur.execute(query, params)
             if "RETURNING" in query.upper():
-                result = self.cur.fetchone()[0]
+                row = self.cur.fetchone()
+                if row :
+                    result = row[0]
             self.conn.commit()
             return result
         except Exception as e :
@@ -259,7 +261,7 @@ class Database :
                 select_spec = full_spec[spec_index - 1][0]
                 services = self.fetch_all('''SELECT DISTINCT s.id, s.title, s.price
                                           FROM Services s
-                                          JOIN MasterServices ms ON s.id = ms.service_id
+                                          JOIN MasterServices ms ON s.id = ms.services_id
                                           JOIN Masters m ON ms.master_id = m.id
                                           WHERE m.specialization = %s
                                           ''', (select_spec,))
@@ -277,7 +279,7 @@ class Database :
                     master_id = self.fetch_all('''SELECT m.id, m.name
                                                FROM Masters m
                                                JOIN MasterServices ms ON m.id = ms.master_id
-                                               WHERE services_id = %s
+                                               WHERE ms.services_id = %s
                                                ''', (s_id,))
                     if not master_id :
                         print("Спеціаліста не існує!")
@@ -292,10 +294,10 @@ class Database :
                         
                     date_id = self.fetch_all('''SELECT id, work_date, work_time
                                  FROM Schedule
-                                 WHERE master_id = %s AND is_available = TRUE
+                                 WHERE master_id = %s AND is_available = 1
                                  ''', (final_master_id,))
                     for row in date_id :
-                        print(f"{row[0]:<4} | {row[1]:<6} - {row[2]:<15}")
+                        print(f"{row[0]:<4} | {row[1]:<11} - {row[2]:<15}")
                     try :
                         d_id = int(input("Оберіть ID бажаного часу: ").strip())
                     except :
@@ -331,3 +333,95 @@ class Database :
             else :
                 print(f"Спеціаліста з ID {spec_index} не існує")
                 return
+
+    def change_booking_status(self) :
+        rows = self.fetch_all('''SELECT b.id, b.status, m.name, s.title, c.name, sch.work_date, sch.work_time, sch.id
+                        FROM Bookings b
+                        JOIN Client c ON b.client_id = c.id
+                        JOIN Masters m ON b.master_id = m.id
+                        JOIN Services s ON b.services_id = s.id
+                        JOIN Schedule sch ON b.schedule_id = sch.id
+                        WHERE b.status = 'pending'
+                        ''')
+        if not rows :
+            print("Запису не існує")
+        else :
+            for row in rows :
+                    print(f"ID: {row[0]:<3} | Статус: {row[1]:<30} | Майстер: {row[2]:<30} | Процедура: {row[3]:<30} | Клієнт: {row[4]:<30} | Дата: {row[5]:<10} | Час: {row[6]:<10}")
+
+        booking_to_schedule = {row[0]: row[7] for row in rows}
+
+        while True :
+            try :
+                confirm = input("Виберіть ID для підтвердження(0 для завершення):").strip()
+                confirm_id = int(confirm)
+            except ValueError :
+                print("Введіть значення цифрою")
+                continue
+            if confirm_id == 0 :
+                print("Допобачення")
+                break
+            elif not booking_to_schedule :
+                print("Записів немає")
+                break
+            elif confirm_id in booking_to_schedule :
+                try :
+                    choice = int(input("Виберіть: 1 - Підтвердити, 2 - Скасувати: ").strip())
+                except ValueError :
+                    print("Введіть значення цифрою")
+                    continue
+                if choice == 1 :
+                    self.execute_query("UPDATE Bookings SET status = %s WHERE id = %s", ('confirmed', confirm_id))
+                    del booking_to_schedule[confirm_id]
+                    print(f"Запис №{confirm_id} підтверджено!")
+                elif choice == 2 :
+                    self.execute_query("UPDATE Bookings SET status = %s WHERE id = %s", ('cancelled', confirm_id))
+                    sch_id = booking_to_schedule[confirm_id]
+                    self.execute_query("UPDATE Schedule SET is_available = 1 WHERE id = %s", (sch_id,))
+                    del booking_to_schedule[confirm_id]
+                    print(f"Запис №{confirm_id} скасовано!")
+                else :
+                    print("Оберіть пункт 1 або 2")
+                    continue
+            else :
+                print("Введіть коректне ID")
+
+    def delete_booking(self) :
+        rows = self.fetch_all('''SELECT b.id, b.status, m.name, s.title, c.name, sch.work_date, sch.work_time, sch.id
+                        FROM Bookings b
+                        JOIN Client c ON b.client_id = c.id
+                        JOIN Masters m ON b.master_id = m.id
+                        JOIN Services s ON b.services_id = s.id
+                        JOIN Schedule sch ON b.schedule_id = sch.id
+                        WHERE b.status IN ('confirmed', 'cancelled')
+                        ''')
+        if not rows :
+            print("Запису не існує")
+        else :
+            for row in rows :
+                    print(f"ID: {row[0]:<3} | Статус: {row[1]:<30} | Майстер: {row[2]:<30} | Процедура: {row[3]:<30} | Клієнт: {row[4]:<30} | Дата: {row[5]:<10} | Час: {row[6]:<10}")
+
+        booking_to_schedule = {row[0]: row[7] for row in rows}
+        
+        while True :
+            try :
+                delete = input("Виберіть ID для видалення(0 для завершення):").strip()
+                delete_id = int(delete)
+            except ValueError :
+                print("Введіть значення цифрою")
+                continue
+            if delete_id == 0 :
+                print("Допобачення")
+                break
+            elif not booking_to_schedule :
+                print("Записів немає")
+                break
+            elif delete_id in booking_to_schedule :
+                self.execute_query("DELETE FROM Bookings WHERE id = %s", (delete_id,))
+                sch_id = booking_to_schedule[delete_id]
+                self.execute_query("UPDATE Schedule SET is_available = 1 WHERE id = %s", (sch_id,))
+                del booking_to_schedule[delete_id]
+                print(f"Запис №{delete_id} видалено!")
+            else :
+                print("Введіть коректне ID")
+                continue

@@ -13,9 +13,11 @@ class AdminManager :
         while True :
             main_menu = (f"Головне меню\n"
                         f"Введіть 1 - додати майстра\n"
-                        f"Введіть 2 - для запису на процедуру\n"
+                        f"Введіть 2 - для додавання процедури\n"
                         f"Введіть 3 - переглянути персонал\n"
                         f"Введіть 4 - налаштувати графік\n"
+                        f"Введіть 5 - підтвердження/скасування запису\n"
+                        f"Введіть 6 - видалення запису\n"
                         f"Введіть 0 - вихід\n")
             print(main_menu)
             try :
@@ -29,20 +31,32 @@ class AdminManager :
             elif action == 1 :
                 self.db.add_master()
                 all_master = self.db.fetch_all("SELECT * FROM Masters")
-                for master in all_master :
-                    print(master)
+                if not all_master :
+                    print("Список порожній")
+                else :
+                    for master in all_master :
+                        print(f"ID: {master[0]} | Ім'я: {master[1]} | Спеціальність: {master[2]}")
 
             elif action == 2 :
                 self.db.add_service()
                 all_services = self.db.fetch_all("SELECT * FROM Services")
-                for service in all_services:
-                    print(service)
+                if not all_services :
+                    print("Список порожній")
+                else :
+                    for service in all_services:
+                        print(f"ID: {service[0]} | Процедура: {service[1]} | Ціна: {service[2]} грн")
 
             elif action == 3 :
                 users = self.db.fetch_all("SELECT id, login, role FROM Users")
                 print("Список користувачів у базі:")
                 for user in users :
-                    print(user)
+                    print(f"ID: {user[0]:<3} | Логін: {user[1]:<15} | Роль: {user[2]}")
 
             elif action == 4 :
                 self.db.add_schedule()
+
+            elif action == 5 :
+                self.db.change_booking_status()
+
+            elif action == 6 :
+                self.db.delete_booking()

@@ -2,11 +2,14 @@ import getpass
 
 from database import Database
 from admin import AdminManager
+from master import MasterManager
 from client import ClientManager
 
 db = Database()
 db.init_admin()
 admin_manager = AdminManager(db)
+
+master_manager = MasterManager(db)
 
 client_manager = ClientManager(db)
 
@@ -32,7 +35,7 @@ while True :
         if user and user['role'] == 'admin' :
             admin_manager.admin_menu(user['id'])
         elif user and user['role'] == 'master' :
-            print("Меню майстра в розробці...")
+            master_manager.master_menu(user['id'])
         else :
             print("Невірний логін або пароль!")
     else :
