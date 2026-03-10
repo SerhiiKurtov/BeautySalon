@@ -11,6 +11,8 @@ import getpass
 
 import calendar
 
+from datetime import datetime
+
 class Database :
     def __init__(self) :
         try :
@@ -24,13 +26,14 @@ class Database :
         try :
             result = None
             self.cur.execute(query, params)
-            if "RETURNING" in query.upper():
+            if "RETURNING" in query.upper() :
                 row = self.cur.fetchone()
                 if row :
                     result = row[0]
             self.conn.commit()
             return result
         except Exception as e :
+            self.conn.rollback()
             print(f"Виникла помилка: {e}")
 
     def fetch_all(self, query, params=()) :
@@ -42,13 +45,13 @@ class Database :
 
     def create_tables(self) :
         sql_tables = '''
-            DROP TABLE IF EXISTS Bookings CASCADE;
-            DROP TABLE IF EXISTS Users CASCADE;
-            DROP TABLE IF EXISTS MasterServices CASCADE;
-            DROP TABLE IF EXISTS Services CASCADE;
-            DROP TABLE IF EXISTS Masters CASCADE;
-            DROP TABLE IF EXISTS Schedule CASCADE;
-            DROP TABLE IF EXISTS Client CASCADE;
+           -- DROP TABLE IF EXISTS Bookings CASCADE;
+           -- DROP TABLE IF EXISTS Users CASCADE;
+           -- DROP TABLE IF EXISTS MasterServices CASCADE;
+           -- DROP TABLE IF EXISTS Services CASCADE;
+           -- DROP TABLE IF EXISTS Masters CASCADE;
+           -- DROP TABLE IF EXISTS Schedule CASCADE;
+           -- DROP TABLE IF EXISTS Client CASCADE;
 
             CREATE TABLE IF NOT EXISTS Users (
                 id SERIAL PRIMARY KEY,
@@ -82,7 +85,8 @@ class Database :
                 work_date DATE NOT NULL,
                 work_time TIME NOT NULL,
                 is_available INTEGER DEFAULT 1,
-                master_id INTEGER REFERENCES Masters (id)
+                master_id INTEGER REFERENCES Masters (id),
+                UNIQUE (work_date, work_time, master_id)
         );
 
             CREATE TABLE IF NOT EXISTS MasterServices (
@@ -156,23 +160,27 @@ class Database :
             print(f"Виникла помилка: {e}")
 
     def add_service(self) :
-        while True :
-            s_title = input("Введіть назву процедури (для завершення введіть стоп): ")
-            if s_title.lower() == 'стоп' :
-                break
-            try :
-                s_price = int(input("Введіть ціну: ").strip())
-            except ValueError :
-                print("Помилка! Ціна має бути числом. Спробуйте ще раз.")
-                continue
-            new_s_id = self.execute_query("INSERT INTO Services (title, price) VALUES (%s, %s) RETURNING id", (s_title, s_price))
-            print(f"Процедура {s_title}, ціна {s_price} збережено!")
-
-            self.show_all_masters()
-            m_ids_input = input("Введіть ID майстрів через пробіл: ").strip().split()
-            for m_id in m_ids_input :
-                if m_id.isdigit() :
-                    self.execute_query("INSERT INTO MasterServices (master_id, services_id) VALUES (%s, %s) RETURNING id", (m_id, new_s_id))
+        masters = self.fetch_all("SELECT id, name, specialization FROM Masters")
+        print("\n--- Список майстрів ---")
+        for m in masters:
+            print(f"ID: {m[0]} | {m[1]} ({m[2]})")
+        try :
+            master_id = int(input("Оберіть ID майстра, якому додаємо послуги: "))
+            while True:
+                service_name = input("Введіть назву процедури ('стоп' для завершення):Назва процедури: ").strip()
+                if service_name == 'стоп' :
+                    break
+                try:
+                    price_name = int(input(f"Ціна для '{service_name}': ").strip())
+                    service_id = self.execute_query("INSERT INTO Services (title, price) VALUES (%s, %s) RETURNING id", (service_name, price_name))
+                    if service_id :
+                        self.execute_query("INSERT INTO MasterServices (master_id, services_id) VALUES (%s, %s)", (master_id, service_id))
+                        print(f"Послуга '{service_name}' додана та закріплена за майстром!")
+                except ValueError :
+                    print("Помилка, ціна має бути числом!")
+            print("Всі послуги для цього майстра збережено.")
+        except ValueError :
+            print("Помилка, введіть коректний ID.")
 
     def show_all_masters(self) :
         rows = self.fetch_all("SELECT id, name, specialization FROM Masters")
@@ -211,6 +219,9 @@ class Database :
             m_id = int(input("Оберіть id майстра: ").strip())
             year = int(input("Oберіть рік (наприклад 2026): ").strip())
             month = int(input("Oберіть місяць від 1 до 12: ").strip())
+            if not 1 <= month <= 12 :
+                print("Місяць має бути від 1 до 12")
+                return
         except Exception as e :
             print(f"Виникла помилка: {e}, введіть данні цифрами!")
             return
@@ -223,7 +234,13 @@ class Database :
             if hour.lower() == 'стоп' :
                 print("Робоці години визначені!")
                 break
-            time_day.append(hour)
+            try :
+                valid_time = datetime.strptime(hour, "%H:%M").time()
+                if hour not in time_day :
+                    time_day.append(valid_time.strftime("%H:%M"))
+                    print(f"Час {valid_time} прийнято.")
+            except ValueError :
+                print("Помилка! Введіть час у форматі HH:MM (наприклад, 09:00).")
         
         for day in range(1, num_day + 1) :
             current_data = f"{year}-{month:02}-{day:02}"
@@ -231,8 +248,10 @@ class Database :
                 try :
                     self.execute_query("INSERT INTO Schedule (work_date, work_time, master_id) VALUES (%s, %s, %s)", (current_data, hour, m_id))
                 except psycopg2.IntegrityError :
+                    self.conn.rollback()
                     print(f"Помилка: Час {hour} на цю дату вже існує!")
                 except Exception as e :
+                    self.conn.rollback()
                     print(f"Виникла помилка: {e}")
 
         weekend_input = input("Введіть числа місяця, які будуть вихідними (через пробіл): ").strip().split()
@@ -297,7 +316,8 @@ class Database :
                                  WHERE master_id = %s AND is_available = 1
                                  ''', (final_master_id,))
                     for row in date_id :
-                        print(f"{row[0]:<4} | {row[1]:<11} - {row[2]:<15}")
+                        time_short = str(row[2])[:5]
+                        print(f"{row[0]} | {row[1]} - {time_short}")
                     try :
                         d_id = int(input("Оберіть ID бажаного часу: ").strip())
                     except :
@@ -425,3 +445,25 @@ class Database :
             else :
                 print("Введіть коректне ID")
                 continue
+
+    def view_master_schedule(self, master_id) :
+        actual_master = self.fetch_all("SELECT id FROM Masters WHERE user_id = %s", (master_id,))
+        if not actual_master :
+            print("Записів немає")
+        else :
+            final_master_id = actual_master[0][0]
+            rows = self.fetch_all('''SELECT b.id, b.status, m.name, s.title, c.name, sch.work_date, sch.work_time, sch.id
+                            FROM Bookings b
+                            JOIN Client c ON b.client_id = c.id
+                            JOIN Masters m ON b.master_id = m.id
+                            JOIN Services s ON b.services_id = s.id
+                            JOIN Schedule sch ON b.schedule_id = sch.id
+                            WHERE b.master_id = %s
+                            ORDER BY sch.work_date, sch.work_time 
+                            ''', (final_master_id,))
+            if not rows :
+                print("Запису не існує")
+            else :
+                for row in rows :
+                        print(f"ID: {row[0]:<3} | Статус: {row[1]:<30} | Майстер: {row[2]:<30} | Процедура: {row[3]:<30} | Клієнт: {row[4]:<30} | Дата: {row[5]:<10} | Час: {row[6]:<10}")
+                        
