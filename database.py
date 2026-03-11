@@ -45,13 +45,13 @@ class Database :
 
     def create_tables(self) :
         sql_tables = '''
-           -- DROP TABLE IF EXISTS Bookings CASCADE;
-           -- DROP TABLE IF EXISTS Users CASCADE;
-           -- DROP TABLE IF EXISTS MasterServices CASCADE;
-           -- DROP TABLE IF EXISTS Services CASCADE;
-           -- DROP TABLE IF EXISTS Masters CASCADE;
-           -- DROP TABLE IF EXISTS Schedule CASCADE;
-           -- DROP TABLE IF EXISTS Client CASCADE;
+            DROP TABLE IF EXISTS Bookings CASCADE;
+            DROP TABLE IF EXISTS Users CASCADE;
+            DROP TABLE IF EXISTS MasterServices CASCADE;
+            DROP TABLE IF EXISTS Services CASCADE;
+            DROP TABLE IF EXISTS Masters CASCADE;
+            DROP TABLE IF EXISTS Schedule CASCADE;
+            DROP TABLE IF EXISTS Client CASCADE;
 
             CREATE TABLE IF NOT EXISTS Users (
                 id SERIAL PRIMARY KEY,
@@ -65,7 +65,8 @@ class Database :
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 specialization VARCHAR(50) NOT NULL,
-                user_id INTEGER REFERENCES Users(id)
+                user_id INTEGER REFERENCES Users(id),
+                is_active BOOLEAN DEFAULT TRUE
         );
 
             CREATE TABLE IF NOT EXISTS Services (
@@ -159,13 +160,30 @@ class Database :
         except Exception as e :
             print(f"Виникла помилка: {e}")
 
+    def delete_masters(self) :
+        self.show_all_masters()
+        try :
+            del_master = int(input("Оберіть ID майстра якого хочете видалити: ").strip())
+            check = self.fetch_all("SELECT 1 FROM Masters WHERE id = %s AND is_active = TRUE", (del_master,))
+            if not check :
+                print(f"Майстра під ID {del_master} не існує")
+            else :
+                self.execute_query("UPDATE Masters SET is_active = %s WHERE id = %s", (False, del_master))
+                self.execute_query("DELETE FROM Schedule WHERE master_id = %s AND work_date >= CURRENT_DATE", (del_master,))
+                self.execute_query("DELETE FROM MasterServices WHERE master_id = %s", (del_master,))
+                print(f"Майстра з ID {del_master} видалено!")
+        except ValueError :
+            print("Помилка, введіть ID цифрою!")
+        except Exception as e:
+            print(f"Виникла системна помилка: {e}")
+
     def add_service(self) :
         masters = self.fetch_all("SELECT id, name, specialization FROM Masters")
         print("\n--- Список майстрів ---")
         for m in masters:
             print(f"ID: {m[0]} | {m[1]} ({m[2]})")
         try :
-            master_id = int(input("Оберіть ID майстра, якому додаємо послуги: "))
+            master_id = int(input("Оберіть ID майстра, якому додаємо послуги: ").strip())
             while True:
                 service_name = input("Введіть назву процедури ('стоп' для завершення):Назва процедури: ").strip()
                 if service_name == 'стоп' :
@@ -183,7 +201,7 @@ class Database :
             print("Помилка, введіть коректний ID.")
 
     def show_all_masters(self) :
-        rows = self.fetch_all("SELECT id, name, specialization FROM Masters")
+        rows = self.fetch_all("SELECT id, name, specialization FROM Masters WHERE is_active = TRUE")
         if not rows :
             print("Майстра не існує!")
         else :

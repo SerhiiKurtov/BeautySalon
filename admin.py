@@ -13,11 +13,12 @@ class AdminManager :
         while True :
             main_menu = (f"Головне меню\n"
                         f"Введіть 1 - додати майстра\n"
-                        f"Введіть 2 - для додавання процедури\n"
+                        f"Введіть 2 - додавання процедури\n"
                         f"Введіть 3 - переглянути персонал\n"
                         f"Введіть 4 - налаштувати графік\n"
                         f"Введіть 5 - підтвердження/скасування запису\n"
                         f"Введіть 6 - видалення запису\n"
+                        f"Введіть 7 - видалення майстра\n"
                         f"Введіть 0 - вихід\n")
             print(main_menu)
             try :
@@ -60,3 +61,12 @@ class AdminManager :
 
             elif action == 6 :
                 self.db.delete_booking()
+
+            elif action == 7 :
+                self.db.delete_masters()
+                all_master = self.db.fetch_all("SELECT * FROM Masters WHERE is_active = TRUE")
+                if not all_master :
+                    print("Список порожній")
+                else :
+                    for master in all_master :
+                        print(f"ID: {master[0]} | Ім'я: {master[1]} | Спеціальність: {master[2]}")
