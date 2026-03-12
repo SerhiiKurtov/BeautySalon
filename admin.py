@@ -21,6 +21,7 @@ class AdminManager :
                         f"Введіть 7 - видалення майстра\n"
                         f"Введіть 8 - зміна прайсу\n"
                         f"Введіть 9 - видалення процедур\n"
+                        f"Введіть 10 - звіт\n"
                         f"Введіть 0 - вихід\n")
             print(main_menu)
             try :
@@ -78,3 +79,6 @@ class AdminManager :
 
             elif action == 9 :
                 self.db.delete_service()
+
+            elif action == 10 :
+                self.db.general_report()

@@ -534,3 +534,29 @@ class Database :
                 for row in rows :
                         print(f"ID: {row[0]:<3} | Статус: {row[1]:<30} | Майстер: {row[2]:<30} | Процедура: {row[3]:<30} | Клієнт: {row[4]:<30} | Дата: {row[5]:<10} | Час: {row[6]:<10}")
                         
+    def general_report(self) :
+        start_data = input("Вкажіть початкову дату звіту(РРРР-ММ-ДД): ")
+        end_data = input("Вкажіть кінцеву дату звіту(РРРР-ММ-ДД): ")
+        self.show_all_masters()
+        which_master = int(input("Оберіть ID майстра(для загального звіту вкажіть 0): ").strip())
+        rows = self.fetch_all('''SELECT b.id, b.status, m.name, s.title, s.price, c.name, c.phone, sch.work_date, sch.work_time, sch.id
+                            FROM Bookings b
+                            JOIN Client c ON b.client_id = c.id
+                            JOIN Masters m ON b.master_id = m.id
+                            JOIN Services s ON b.services_id = s.id
+                            JOIN Schedule sch ON b.schedule_id = sch.id
+                            WHERE (sch.work_date BETWEEN %s AND %s) AND (%s = 0 OR m.id = %s)
+                            ORDER BY sch.work_date, sch.work_time 
+                            ''', (start_data, end_data, which_master, which_master))
+        if not rows :
+            print("Запису не існує")
+        else :
+            total_revenue = 0
+            confirmed_count = 0
+            for row in rows :
+                        if row[1] == 'confirmed' :
+                            total_revenue += (row[4] or 0)
+                            confirmed_count +=1
+                        print(f"ID: {row[0]:<3} | Статус: {row[1]:<30} | Майстер: {row[2]:<30} | Процедура: {row[3]:<30} | Ціна в грн: {row[4]:<6} | Клієнт: {row[5]:<30} | Номер телефону: {row[6]:<12} | Дата: {row[7]:<10} | Час: {row[8]:<10}")
+            print(f"Кількість підтверджених процедур: {confirmed_count}")
+            print(f"Сума прибутку: {total_revenue}")            
