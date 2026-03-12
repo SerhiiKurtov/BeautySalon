@@ -19,6 +19,8 @@ class AdminManager :
                         f"Введіть 5 - підтвердження/скасування запису\n"
                         f"Введіть 6 - видалення запису\n"
                         f"Введіть 7 - видалення майстра\n"
+                        f"Введіть 8 - зміна прайсу\n"
+                        f"Введіть 9 - видалення процедур\n"
                         f"Введіть 0 - вихід\n")
             print(main_menu)
             try :
@@ -70,3 +72,9 @@ class AdminManager :
                 else :
                     for master in all_master :
                         print(f"ID: {master[0]} | Ім'я: {master[1]} | Спеціальність: {master[2]}")
+
+            elif action == 8 :
+                self.db.edit_price()
+
+            elif action == 9 :
+                self.db.delete_service()

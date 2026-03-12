@@ -200,6 +200,55 @@ class Database :
         except ValueError :
             print("Помилка, введіть коректний ID.")
 
+    def edit_price(self) :
+        self.show_all_masters()
+        try :
+            master_price = int(input("Оберіть ID майстра якому бажаєте змінити прайс: ").strip())
+            check = self.fetch_all('''SELECT s.id, s.title, s.price
+                                     FROM Services s
+                                     JOIN MasterServices ms ON s.id = ms.services_id
+                                     WHERE ms.master_id = %s
+                                    ''', (master_price,))
+            if not check :
+                print(f"У майстра під ID {master_price} ще немає призначених послуг або ID вказано невірно")
+            else :
+                for c in check :
+                    print(f"ID: {c[0]} | Процедура: {c[1]} | Ціна: {c[2]} грн")
+                service = int(input("Оберіть ID процедури для зміни ціни: ").strip())
+                allowed_ids = [c[0] for c in check]
+                if service in allowed_ids : 
+                    new_price = int(input("Введіть нову ціну: ").strip())
+                    self.execute_query("UPDATE Services SET price = %s WHERE id = %s", (new_price, service))
+                    print("Ціну оновлено!")
+                else :
+                    print("Помилка, ви обрали ID послуги, якої немає у цього майстра")
+        except ValueError :
+            print("Помилка, введіть коректний ID.")
+
+    def delete_service(self) :
+        self.show_all_masters()
+        try :
+            master_id = int(input("Оберіть ID майстра якому бажаєте змінити прайс: ").strip())
+            check = self.fetch_all('''SELECT s.id, s.title, s.price
+                                     FROM Services s
+                                     JOIN MasterServices ms ON s.id = ms.services_id
+                                     WHERE ms.master_id = %s
+                                    ''', (master_id,))
+            if not check :
+                print(f"У майстра під ID {master_id} ще немає призначених послуг або ID вказано невірно")
+            else :
+                for c in check :
+                    print(f"ID: {c[0]} | Процедура: {c[1]} | Ціна: {c[2]} грн")
+                service = int(input("Оберіть ID для видалення процедури: ").strip())
+                allowed_ids = [c[0] for c in check]
+                if service in allowed_ids :
+                    self.execute_query("DELETE FROM MasterServices WHERE master_id = %s AND services_id = %s", (master_id, service))
+                    print("Процедуру видалено!")
+                else :
+                    print("Помилка, ви обрали ID послуги, якої немає у цього майстра")
+        except ValueError :
+            print("Помилка, введіть коректний ID.")
+
     def show_all_masters(self) :
         rows = self.fetch_all("SELECT id, name, specialization FROM Masters WHERE is_active = TRUE")
         if not rows :
